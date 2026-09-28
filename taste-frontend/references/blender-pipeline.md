@@ -15,8 +15,10 @@ That loop is mandatory, not optional. Never hand over a render nobody looked at.
 Blender ships Python and runs headless. No API or connector is needed, only the binary on PATH.
 
 ```bash
-blender --background --python scene.py -- --out render.png --frames 36
+blender --background --python scene.py -- --out render --frames 36
 ```
+
+The `--out` value carries no extension, because Blender appends one. See trap 3.
 
 Everything after the bare `--` is passed to the script rather than eaten by Blender, so read arguments like this:
 
@@ -27,20 +29,39 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 
 On Windows the installer does not add Blender to PATH, which does not matter: call it by full path, typically `C:\Program Files\Blender Foundation\Blender <ver>\blender.exe`.
 
+On Linux there is no installer at all, only a tarball, so nothing is on PATH either. `pipeline/setup.sh` unpacks it to `$HOME/.local/blender` and `pipeline/render.sh` calls that path directly. Verified on Ubuntu with the 5.2.1 LTS linux-x64 build.
+
 ### Four traps, all hit on the first real run
 
 **1. Relative render paths fail silently.** Blender resolves `scene.render.filepath` against the .blend file, and a headless factory-reset session has none. It reports success and writes nothing. Always absolutize:
 
 ```python
-OUT = os.path.abspath(arg("--out", "out/still.png"))
+OUT = os.path.abspath(arg("--out", "out/still"))
 ```
 
-**2. Enum names are version-specific.** Blender 5.2 LTS uses `BLENDER_EEVEE`, not the `BLENDER_EEVEE_NEXT` introduced in 4.2. Same for colour looks: `AgX - Medium Contrast` does not exist in 5.2, `AgX - Base Contrast` does. Print the valid values instead of guessing:
+**2. Enum names are version-specific.** Blender 5.2 LTS uses `BLENDER_EEVEE`, not the `BLENDER_EEVEE_NEXT` introduced in 4.2. Same for colour looks: `AgX - Medium Contrast` does not exist in 5.2, `AgX - Base Contrast` does. Ask the running binary instead of guessing.
+
+Reading the enum is not enough, and on Linux it lies. Cycles is an add-on, it is not enabled in a `--python-expr` session, and the enum stays static even once it is enabled, so the list comes back as `['BLENDER_EEVEE']` on a machine where `render.engine = "CYCLES"` assigns without complaint. Enable the add-on, then probe by assignment:
 
 ```bash
-blender --background --python-expr "import bpy; print(bpy.app.version_string); \
-print([i.identifier for i in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items])"
+blender --background --python-expr "import bpy, addon_utils; addon_utils.enable('cycles'); \
+print(bpy.app.version_string); r = bpy.context.scene.render; ok = []
+for e in ('BLENDER_EEVEE', 'BLENDER_EEVEE_NEXT', 'CYCLES', 'BLENDER_WORKBENCH'):
+    try:
+        r.engine = e; ok.append(e)
+    except TypeError:
+        pass
+print('ENGINES', ok)"
 ```
+
+Real output on Ubuntu, Blender 5.2.1 LTS, no GPU:
+
+```
+5.2.1 LTS
+ENGINES ['BLENDER_EEVEE', 'CYCLES', 'BLENDER_WORKBENCH']
+```
+
+EEVEE does render on that machine, headless and with no GPU, so the fallback to Cycles was not needed. Colour looks behave the same way: `view_settings.bl_rna.properties['look'].enum_items` reports only `NONE`, while `view_settings.look = "AgX - Base Contrast"` assigns and `"AgX - Medium Contrast"` raises `TypeError`. Assign, do not list.
 
 **3. Render sequences as WEBP, not PNG.** A 36 frame turntable at 720px came to **6.3MB as PNG and 576KB as WebP**, an 11x saving with no visible loss on flat-shaded geometry, and WebP keeps the alpha. Set `image_settings.file_format = "WEBP"` and `quality = 88`. Note that Blender appends the extension itself, so the filepath must not carry one.
 
@@ -163,7 +184,7 @@ Rendering 36 frames of a composition nobody has checked is the main way to waste
 
 Worth recording, because none of it was predictable from the script and all of it was obvious in the render:
 
-- **Pass one: the object overflowed the frame.** An 85mm lens on a 36mm sensor sees about 24 degrees, so an object 4 units across needs roughly 14 units of distance, not 8.5. Compute the framing rather than eyeballing it.
+- **Pass one: the object overflowed the frame.** An 85mm lens on a 36mm sensor sees about 24 degrees, so an object 4 units across needs roughly 14 units of distance, not 8.5. Compute the framing rather than eyeballing it. The `D * 2.35` above is the edge to edge fit with no margin, which is where the 14 rather than 9.4 comes from: measured on `pipeline/canary.py`, a 3.56 unit ring at `D * 2.35` sits corner to corner in the frame with nothing to spare.
 - **Pass one: the feature was invisible.** The waveform spike deviated perpendicular to the ring, which meant it pointed straight at the camera and vanished. Making it deviate **radially**, in the plane of the ring, made it read instantly. A form's signature detail has to be visible in silhouette.
 - **Pass two: the material rendered flat.** A pale, barely-metallic surface under soft light has almost no shading variation. Darker base colour plus high metallic gave it depth.
 - **Pass two: the feature sat at the far left.** Rotating it upper-right, where the eye lands first, made the whole composition settle.
