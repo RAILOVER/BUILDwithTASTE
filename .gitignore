@@ -4,3 +4,5 @@ desktop.ini
 *.tmp
 node_modules/
 pipeline/node_modules/
+pipeline/out/
+pipeline/package-lock.json
