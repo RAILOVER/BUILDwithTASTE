@@ -67,13 +67,18 @@ if (found.size) { for (const k of [...found].sort()) console.log('   ' + k); }
 else console.log('   none');
 console.log('   confirm each is installed before relying on it');
 
-// 4. every skill folder has its SKILL.md with front matter
+// 4. every skill folder has its SKILL.md with front matter.
+// a folder counts as a skill when it holds a SKILL.md or a references/ directory,
+// so infrastructure folders like pipeline/ and playbooks/ are not mistaken for one.
 console.log('4. skill front matter');
 let broken = 0;
 for (const d of fs.readdirSync(ROOT, { withFileTypes: true })) {
   if (!d.isDirectory() || d.name.startsWith('.') || d.name === 'node_modules') continue;
-  const skill = path.join(ROOT, d.name, 'SKILL.md');
-  if (!fs.existsSync(skill)) { console.log('   ' + d.name + ': no SKILL.md'); broken++; continue; }
+  const dir = path.join(ROOT, d.name);
+  const skill = path.join(dir, 'SKILL.md');
+  const looksLikeSkill = fs.existsSync(skill) || fs.existsSync(path.join(dir, 'references'));
+  if (!looksLikeSkill) continue;
+  if (!fs.existsSync(skill)) { console.log('   ' + d.name + ': has references/ but no SKILL.md'); broken++; continue; }
   const head = fs.readFileSync(skill, 'utf8').slice(0, 2000);
   if (!/^---[\s\S]*?\bname:\s*\S/.test(head) || !/\bdescription:\s*\S/.test(head)) {
     console.log('   ' + d.name + ': SKILL.md front matter missing name or description'); broken++;

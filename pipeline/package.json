@@ -1,0 +1,12 @@
+{
+  "name": "taste-pipeline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The asset factory behind the TASTE skills: Blender rendering and image processing.",
+  "scripts": {
+    "setup": "bash setup.sh"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}

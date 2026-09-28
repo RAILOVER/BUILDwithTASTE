@@ -63,6 +63,14 @@ taste-frontend/
   assets/                       accepted generated assets, kept as reference
 ```
 
+## For an autonomous agent
+
+Devin, or any agent working on this repository, reads `DEVIN.md` first. It sets the division of labour, which is not negotiable: a person decides how things look, an agent runs the machine.
+
+`playbooks/` holds the standing jobs, one file each: the asset factory, a prospect audit, the review gate, and keeping this repository honest. `pipeline/` holds what they execute, Blender rendering and image processing. `knowledge/devin-rules.md` is the rule set compressed for a knowledge base.
+
+Nothing in `pipeline/` has been run on a Linux machine yet. The first task to use it reports what actually happened, and the scripts get corrected from that report.
+
 ## Install
 
 The skills live here and are linked into Claude Code's skill folder. On Windows, from an elevated prompt or with Developer Mode on:
